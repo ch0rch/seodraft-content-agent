@@ -24,17 +24,6 @@ export default defineTool({
   description:
     "Download and return the contents of a Vercel Blob asset. Use when the writer wants to " +
     "read or reuse a stored file. Text is returned raw; binary files come back base64-encoded.",
-  inputSchema: z.object({
-    url: z.url().describe("The full Vercel Blob URL of the asset to download."),
-  }),
-  outputSchema: z.object({
-    success: z.boolean(),
-    url: z.string(),
-    contentType: z.string().optional(),
-    isBase64: z.boolean().optional(),
-    content: z.string().optional(),
-    error: z.string().optional(),
-  }),
   /**
    * Fetch and return the asset contents.
    *
@@ -45,26 +34,26 @@ export default defineTool({
   async execute({ url }) {
     if (isReservedWriterUrl(url)) {
       return {
+        error: "Writer preferences are private — use get_writer_preferences.",
         success: false,
         url,
-        error: "Writer preferences are private — use get_writer_preferences.",
       };
     }
     try {
       if (!new URL(url).hostname.endsWith(BLOB_HOST_SUFFIX)) {
         return {
+          error: `Refusing to download: only Vercel Blob URLs (*${BLOB_HOST_SUFFIX}) are allowed.`,
           success: false,
           url,
-          error: `Refusing to download: only Vercel Blob URLs (*${BLOB_HOST_SUFFIX}) are allowed.`,
         };
       }
 
       const response = await fetch(url);
       if (!response.ok) {
         return {
+          error: `Failed to download: ${response.status} ${response.statusText}`,
           success: false,
           url,
-          error: `Failed to download: ${response.status} ${response.statusText}`,
         };
       }
 
@@ -76,13 +65,24 @@ export default defineTool({
         ? await response.text()
         : Buffer.from(await response.arrayBuffer()).toString("base64");
 
-      return { success: true, url, contentType, isBase64: !isText, content };
+      return { content, contentType, isBase64: !isText, success: true, url };
     } catch (error) {
       return {
+        error: error instanceof Error ? error.message : "Download failed",
         success: false,
         url,
-        error: error instanceof Error ? error.message : "Download failed",
       };
     }
   },
+  inputSchema: z.object({
+    url: z.url().describe("The full Vercel Blob URL of the asset to download."),
+  }),
+  outputSchema: z.object({
+    content: z.string().optional(),
+    contentType: z.string().optional(),
+    error: z.string().optional(),
+    isBase64: z.boolean().optional(),
+    success: z.boolean(),
+    url: z.string(),
+  }),
 });

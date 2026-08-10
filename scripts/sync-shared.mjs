@@ -105,16 +105,16 @@ const GENERATED_HEADER = [
  */
 const SHARED_FILES = [
   {
-    name: "ai-phrases-to-avoid.md",
     lines: [
       "- `references/ai-phrases-to-avoid.md` — AI-tell words, phrases, and punctuation to avoid.",
     ],
+    name: "ai-phrases-to-avoid.md",
   },
   {
-    name: "plain-english-alternatives.md",
     lines: [
       "- `references/plain-english-alternatives.md` — plain-English swaps for bloated or vague wording.",
     ],
+    name: "plain-english-alternatives.md",
   },
 ];
 
@@ -186,15 +186,16 @@ const resolveWithin = (base, target) => {
  * @throws When a configured filename is unsafe or a source file is missing.
  */
 const readSources = async () => {
-  const sources = new Map();
-  for (const { name } of SHARED_FILES) {
-    if (!isSafeSegment(name)) {
-      throw new Error(`unsafe shared filename: ${name}`);
-    }
-    const path = resolveWithin(sharedDir, join(sharedDir, name));
-    sources.set(name, await readFile(path, "utf8"));
-  }
-  return sources;
+  const entries = await Promise.all(
+    SHARED_FILES.map(async ({ name }) => {
+      if (!isSafeSegment(name)) {
+        throw new Error(`unsafe shared filename: ${name}`);
+      }
+      const path = resolveWithin(sharedDir, join(sharedDir, name));
+      return [name, await readFile(path, "utf8")];
+    })
+  );
+  return new Map(entries);
 };
 
 /**
@@ -283,37 +284,44 @@ const syncSharedReferences = async (sources) => {
     .map((entry) => entry.name);
 
   // Phase 1 — resolve paths and validate every SKILL.md before touching the filesystem.
-  const plans = [];
-  for (const skill of skills) {
-    const referencesDir = resolveWithin(
-      skillsDir,
-      join(skillsDir, skill, "references")
-    );
-    const skillFile = resolveWithin(
-      skillsDir,
-      join(skillsDir, skill, "SKILL.md")
-    );
-    const { currentMd, nextMd } = await planSkillSection(skillFile);
-    plans.push({ currentMd, nextMd, referencesDir, skillFile });
-  }
+  const plans = await Promise.all(
+    skills.map(async (skill) => {
+      const referencesDir = resolveWithin(
+        skillsDir,
+        join(skillsDir, skill, "references")
+      );
+      const skillFile = resolveWithin(
+        skillsDir,
+        join(skillsDir, skill, "SKILL.md")
+      );
+      const { currentMd, nextMd } = await planSkillSection(skillFile);
+      return { currentMd, nextMd, referencesDir, skillFile };
+    })
+  );
 
   // Phase 2 — apply, writing only what actually changed.
-  let written = 0;
-  let sections = 0;
-  for (const { currentMd, nextMd, referencesDir, skillFile } of plans) {
-    await mkdir(referencesDir, { recursive: true });
-    for (const [name, contents] of sources) {
-      const destination = resolveWithin(skillsDir, join(referencesDir, name));
-      if (await writeIfChanged(destination, contents)) {
-        written += 1;
+  const results = await Promise.all(
+    plans.map(async ({ currentMd, nextMd, referencesDir, skillFile }) => {
+      await mkdir(referencesDir, { recursive: true });
+      const writes = await Promise.all(
+        [...sources].map(([name, contents]) =>
+          writeIfChanged(
+            resolveWithin(skillsDir, join(referencesDir, name)),
+            contents
+          )
+        )
+      );
+      let sectionChanged = false;
+      if (nextMd !== currentMd) {
+        await writeFile(skillFile, nextMd);
+        sectionChanged = true;
       }
-    }
-    if (nextMd !== currentMd) {
-      await writeFile(skillFile, nextMd);
-      sections += 1;
-    }
-  }
-  return { skills: skills.length, written, sections };
+      return { sectionChanged, writes: writes.filter(Boolean).length };
+    })
+  );
+  const written = results.reduce((sum, result) => sum + result.writes, 0);
+  const sections = results.filter((result) => result.sectionChanged).length;
+  return { sections, skills: skills.length, written };
 };
 
 /**
@@ -381,30 +389,34 @@ const generateReviewerRubric = async (sources) => {
     .map((entry) => entry.name)
     .sort();
 
-  const surfaces = {};
-  for (const skill of skills) {
-    const surface = skill.slice(0, -SKILL_SUFFIX.length);
-    const referencesDir = resolveWithin(
-      skillsDir,
-      join(skillsDir, skill, "references")
-    );
-    const refEntries = await readdir(referencesDir);
-    const specsName = refEntries.find((name) => name.endsWith(SPECS_SUFFIX));
-    if (!specsName) {
-      throw new Error(
-        `${skill}: no "*${SPECS_SUFFIX}" specs file in references/`
+  const surfaceEntries = await Promise.all(
+    skills.map(async (skill) => {
+      const surface = skill.slice(0, -SKILL_SUFFIX.length);
+      const referencesDir = resolveWithin(
+        skillsDir,
+        join(skillsDir, skill, "references")
       );
-    }
-    const bestPractices = await readFile(
-      resolveWithin(skillsDir, join(referencesDir, BEST_PRACTICES_FILE)),
-      "utf8"
-    );
-    const specs = await readFile(
-      resolveWithin(skillsDir, join(referencesDir, specsName)),
-      "utf8"
-    );
-    surfaces[surface] = { bestPractices, specs };
-  }
+      const refEntries = await readdir(referencesDir);
+      const specsName = refEntries.find((name) => name.endsWith(SPECS_SUFFIX));
+      if (!specsName) {
+        throw new Error(
+          `${skill}: no "*${SPECS_SUFFIX}" specs file in references/`
+        );
+      }
+      const [bestPractices, specs] = await Promise.all([
+        readFile(
+          resolveWithin(skillsDir, join(referencesDir, BEST_PRACTICES_FILE)),
+          "utf8"
+        ),
+        readFile(
+          resolveWithin(skillsDir, join(referencesDir, specsName)),
+          "utf8"
+        ),
+      ]);
+      return [surface, { bestPractices, specs }];
+    })
+  );
+  const surfaces = Object.fromEntries(surfaceEntries);
 
   const data = {
     house: {
@@ -432,12 +444,13 @@ const generateSurfacesModule = async (surfaces) => {
   return writeIfChanged(path, renderSurfacesModule(surfaces));
 };
 
-const sources = await readSources();
-const { skills, written, sections } = await syncSharedReferences(sources);
-const { changed, surfaces } = await generateReviewerRubric(sources);
-await generateSurfacesModule(surfaces);
+const sharedSources = await readSources();
+const { skills, written, sections } = await syncSharedReferences(sharedSources);
+const { changed, surfaces: surfaceIds } =
+  await generateReviewerRubric(sharedSources);
+await generateSurfacesModule(surfaceIds);
 process.stdout.write(
   `shared skill references: wrote ${written} file(s), updated ${sections} SKILL.md ` +
     `section(s) across ${skills} skill(s); reviewer rubric: ` +
-    `${changed ? "regenerated" : "unchanged"} (${surfaces.length} surfaces)\n`
+    `${changed ? "regenerated" : "unchanged"} (${surfaceIds.length} surfaces)\n`
 );

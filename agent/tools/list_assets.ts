@@ -14,36 +14,6 @@ export default defineTool({
   description:
     "List assets in Vercel Blob storage, optionally filtered by a path prefix. Returns each " +
     "asset's URL, size, and upload date. Use to browse stored content or locate an asset.",
-  inputSchema: z.object({
-    prefix: z
-      .string()
-      .optional()
-      .describe(
-        'Filter by path prefix/folder, e.g. "drafts/". Omit to list everything.'
-      ),
-    limit: z
-      .number()
-      .int()
-      .min(1)
-      .max(1000)
-      .optional()
-      .describe("Maximum number of assets to return. Defaults to 1000."),
-  }),
-  outputSchema: z.object({
-    assets: z.array(
-      z.object({
-        url: z.string(),
-        downloadUrl: z.string(),
-        pathname: z.string(),
-        size: z.number(),
-        uploadedAt: z.string(),
-      })
-    ),
-    count: z.number(),
-    hasMore: z.boolean(),
-    cursor: z.string().optional(),
-    error: z.string().optional(),
-  }),
   /**
    * List matching assets.
    *
@@ -53,29 +23,59 @@ export default defineTool({
    */
   async execute({ prefix, limit }) {
     try {
-      const { blobs, hasMore, cursor } = await list({ prefix, limit });
+      const { blobs, hasMore, cursor } = await list({ limit, prefix });
       const visible = blobs.filter(
         (blob) => !isReservedWriterPath(blob.pathname)
       );
       return {
         assets: visible.map((blob) => ({
-          url: blob.url,
           downloadUrl: blob.downloadUrl,
           pathname: blob.pathname,
           size: blob.size,
           uploadedAt: blob.uploadedAt.toISOString(),
+          url: blob.url,
         })),
         count: visible.length,
-        hasMore,
         cursor,
+        hasMore,
       };
     } catch (error) {
       return {
         assets: [],
         count: 0,
-        hasMore: false,
         error: error instanceof Error ? error.message : "Failed to list assets",
+        hasMore: false,
       };
     }
   },
+  inputSchema: z.object({
+    limit: z
+      .number()
+      .int()
+      .min(1)
+      .max(1000)
+      .optional()
+      .describe("Maximum number of assets to return. Defaults to 1000."),
+    prefix: z
+      .string()
+      .optional()
+      .describe(
+        'Filter by path prefix/folder, e.g. "drafts/". Omit to list everything.'
+      ),
+  }),
+  outputSchema: z.object({
+    assets: z.array(
+      z.object({
+        downloadUrl: z.string(),
+        pathname: z.string(),
+        size: z.number(),
+        uploadedAt: z.string(),
+        url: z.string(),
+      })
+    ),
+    count: z.number(),
+    cursor: z.string().optional(),
+    error: z.string().optional(),
+    hasMore: z.boolean(),
+  }),
 });

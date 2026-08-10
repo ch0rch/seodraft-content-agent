@@ -86,11 +86,6 @@ export default defineTool({
   description:
     "Check a draft against the active surface's style rules and return any violations. " +
     "Run before proposing a draft to the writer.",
-  inputSchema: z.object({
-    surface: z.enum(SURFACES),
-    text: z.string().min(1).max(MAX_TEXT_LENGTH),
-  }),
-  outputSchema: OUTPUT_SCHEMA,
   /**
    * Scan `text` for any banned word defined by the surface's style skill.
    *
@@ -123,4 +118,9 @@ export default defineTool({
       ),
     };
   },
+  inputSchema: z.object({
+    surface: z.enum(SURFACES),
+    text: z.string().min(1).max(MAX_TEXT_LENGTH),
+  }),
+  outputSchema: OUTPUT_SCHEMA,
 });

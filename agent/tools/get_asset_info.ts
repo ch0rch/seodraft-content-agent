@@ -15,19 +15,6 @@ export default defineTool({
   description:
     "Get metadata (size, content type, upload date) for a Vercel Blob asset without " +
     "downloading it. Use to check whether an asset exists or inspect it before downloading.",
-  inputSchema: z.object({
-    url: z.url().describe("The full Blob URL of the asset to inspect."),
-  }),
-  outputSchema: z.object({
-    exists: z.boolean(),
-    url: z.string(),
-    downloadUrl: z.string().optional(),
-    pathname: z.string().optional(),
-    size: z.number().optional(),
-    contentType: z.string().optional(),
-    uploadedAt: z.string().optional(),
-    error: z.string().optional(),
-  }),
   /**
    * Look up the asset's metadata.
    *
@@ -37,28 +24,41 @@ export default defineTool({
   async execute({ url }) {
     if (isReservedWriterUrl(url)) {
       return {
+        error: "Writer preferences are private — use get_writer_preferences.",
         exists: false,
         url,
-        error: "Writer preferences are private — use get_writer_preferences.",
       };
     }
     try {
       const metadata = await head(url);
       return {
-        exists: true,
-        url: metadata.url,
+        contentType: metadata.contentType,
         downloadUrl: metadata.downloadUrl,
+        exists: true,
         pathname: metadata.pathname,
         size: metadata.size,
-        contentType: metadata.contentType,
         uploadedAt: metadata.uploadedAt.toISOString(),
+        url: metadata.url,
       };
     } catch (error) {
       return {
+        error: error instanceof Error ? error.message : "Asset not found",
         exists: false,
         url,
-        error: error instanceof Error ? error.message : "Asset not found",
       };
     }
   },
+  inputSchema: z.object({
+    url: z.url().describe("The full Blob URL of the asset to inspect."),
+  }),
+  outputSchema: z.object({
+    contentType: z.string().optional(),
+    downloadUrl: z.string().optional(),
+    error: z.string().optional(),
+    exists: z.boolean(),
+    pathname: z.string().optional(),
+    size: z.number().optional(),
+    uploadedAt: z.string().optional(),
+    url: z.string(),
+  }),
 });

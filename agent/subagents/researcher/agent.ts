@@ -31,70 +31,70 @@ export default defineAgent({
     "caller passes the question and any known context in the message.",
   model: "anthropic/claude-opus-4.8",
   outputSchema: {
-    type: "object",
     additionalProperties: false,
-    required: ["summary", "findings", "gaps"],
     properties: {
-      summary: {
-        type: "string",
-        description:
-          "A 1-3 sentence synthesis of what the research establishes, for the root to scan first.",
-      },
       findings: {
-        type: "array",
         description:
           "One entry per verified factual claim; every entry carries at least one real source.",
         items: {
-          type: "object",
           additionalProperties: false,
-          required: ["claim", "sources", "confidence", "notes"],
           properties: {
             claim: {
-              type: "string",
               description:
                 "A single, specific factual claim the draft can rely on.",
-            },
-            sources: {
-              type: "array",
-              description:
-                "The real, fetched sources backing the claim; never empty, never invented.",
-              minItems: 1,
-              items: {
-                type: "object",
-                additionalProperties: false,
-                required: ["url", "title"],
-                properties: {
-                  url: {
-                    type: "string",
-                    description: "The source URL, as visited.",
-                  },
-                  title: {
-                    type: "string",
-                    description: "The source's title or publication name.",
-                  },
-                },
-              },
+              type: "string",
             },
             confidence: {
-              type: "string",
-              enum: ["high", "medium", "low"],
               description:
                 "'high' = multiple strong independent sources; 'low' = single or weaker source.",
+              enum: ["high", "medium", "low"],
+              type: "string",
             },
             notes: {
-              type: "string",
               description:
                 "Caveats: date-sensitivity, scope limits, or where sources disagree.",
+              type: "string",
+            },
+            sources: {
+              description:
+                "The real, fetched sources backing the claim; never empty, never invented.",
+              items: {
+                additionalProperties: false,
+                properties: {
+                  title: {
+                    description: "The source's title or publication name.",
+                    type: "string",
+                  },
+                  url: {
+                    description: "The source URL, as visited.",
+                    type: "string",
+                  },
+                },
+                required: ["url", "title"],
+                type: "object",
+              },
+              minItems: 1,
+              type: "array",
             },
           },
+          required: ["claim", "sources", "confidence", "notes"],
+          type: "object",
         },
+        type: "array",
       },
       gaps: {
-        type: "array",
         description:
           "What could not be found or verified; surfaced to the writer rather than guessed at.",
         items: { type: "string" },
+        type: "array",
+      },
+      summary: {
+        description:
+          "A 1-3 sentence synthesis of what the research establishes, for the root to scan first.",
+        type: "string",
       },
     },
+    required: ["summary", "findings", "gaps"],
+    type: "object",
   },
 });

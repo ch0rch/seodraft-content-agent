@@ -27,20 +27,6 @@ export default defineTool({
     "Save this writer's standing style preferences (Markdown). Overwrites the whole document — " +
     "load the current preferences first, merge in the new one, then save. Use only for durable " +
     "preferences the writer states, not one-off edits to a single draft.",
-  inputSchema: z.object({
-    preferences: z
-      .string()
-      .min(1)
-      .max(MAX_PREFERENCES_LENGTH)
-      .describe(
-        "The full preferences document as Markdown — the merged result, not just the new note."
-      ),
-  }),
-  outputSchema: z.object({
-    success: z.boolean(),
-    pathname: z.string().optional(),
-    error: z.string().optional(),
-  }),
   /**
    * Write the current writer's preferences file.
    *
@@ -52,24 +38,38 @@ export default defineTool({
     const key = writerPreferencesKey(ctx.session.auth.current);
     if (!key) {
       return {
-        success: false,
         error: "No signed-in writer to save preferences for.",
+        success: false,
       };
     }
     try {
       const blob = await put(key, preferences, {
         access: "public",
-        contentType: "text/markdown",
         addRandomSuffix: false,
         allowOverwrite: true,
+        contentType: "text/markdown",
       });
-      return { success: true, pathname: blob.pathname };
+      return { pathname: blob.pathname, success: true };
     } catch (error) {
       return {
-        success: false,
         error:
           error instanceof Error ? error.message : "Failed to save preferences",
+        success: false,
       };
     }
   },
+  inputSchema: z.object({
+    preferences: z
+      .string()
+      .min(1)
+      .max(MAX_PREFERENCES_LENGTH)
+      .describe(
+        "The full preferences document as Markdown — the merged result, not just the new note."
+      ),
+  }),
+  outputSchema: z.object({
+    error: z.string().optional(),
+    pathname: z.string().optional(),
+    success: z.boolean(),
+  }),
 });

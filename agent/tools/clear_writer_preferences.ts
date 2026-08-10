@@ -14,16 +14,10 @@ import { writerPreferencesKey } from "#lib/writer-preferences.js";
  * Authorization resolves from the ambient Vercel OIDC credentials.
  */
 export default defineTool({
+  approval: always(),
   description:
     "Permanently delete this writer's saved style preferences. Use only when the writer " +
     "explicitly asks to reset or forget their preferences. This is irreversible.",
-  inputSchema: z.object({}),
-  outputSchema: z.object({
-    success: z.boolean(),
-    deleted: z.boolean(),
-    error: z.string().optional(),
-  }),
-  approval: always(),
   /**
    * Delete the current writer's preferences file, if any.
    *
@@ -36,28 +30,34 @@ export default defineTool({
     const key = writerPreferencesKey(ctx.session.auth.current);
     if (!key) {
       return {
-        success: false,
         deleted: false,
         error: "No signed-in writer to clear preferences for.",
+        success: false,
       };
     }
     try {
-      const { blobs } = await list({ prefix: key, limit: 1 });
+      const { blobs } = await list({ limit: 1, prefix: key });
       const blob = blobs.find((b) => b.pathname === key);
       if (!blob) {
-        return { success: true, deleted: false };
+        return { deleted: false, success: true };
       }
       await del(blob.url);
-      return { success: true, deleted: true };
+      return { deleted: true, success: true };
     } catch (error) {
       return {
-        success: false,
         deleted: false,
         error:
           error instanceof Error
             ? error.message
             : "Failed to clear preferences",
+        success: false,
       };
     }
   },
+  inputSchema: z.object({}),
+  outputSchema: z.object({
+    deleted: z.boolean(),
+    error: z.string().optional(),
+    success: z.boolean(),
+  }),
 });

@@ -16,12 +16,6 @@ export default defineTool({
   description:
     "Load this writer's saved style preferences (standing notes that personalize drafts on top " +
     "of the house style). Call it before drafting; returns empty when the writer has none yet.",
-  inputSchema: z.object({}),
-  outputSchema: z.object({
-    found: z.boolean(),
-    preferences: z.string(),
-    error: z.string().optional(),
-  }),
   /**
    * Read the current writer's preferences file.
    *
@@ -33,13 +27,13 @@ export default defineTool({
     const key = writerPreferencesKey(ctx.session.auth.current);
     if (!key) {
       return {
+        error: "No signed-in writer to load preferences for.",
         found: false,
         preferences: "",
-        error: "No signed-in writer to load preferences for.",
       };
     }
     try {
-      const { blobs } = await list({ prefix: key, limit: 1 });
+      const { blobs } = await list({ limit: 1, prefix: key });
       const blob = blobs.find((b) => b.pathname === key);
       if (!blob) {
         return { found: false, preferences: "" };
@@ -47,19 +41,25 @@ export default defineTool({
       const response = await fetch(blob.url);
       if (!response.ok) {
         return {
+          error: `Failed to read preferences: ${response.status} ${response.statusText}`,
           found: false,
           preferences: "",
-          error: `Failed to read preferences: ${response.status} ${response.statusText}`,
         };
       }
       return { found: true, preferences: await response.text() };
     } catch (error) {
       return {
-        found: false,
-        preferences: "",
         error:
           error instanceof Error ? error.message : "Failed to load preferences",
+        found: false,
+        preferences: "",
       };
     }
   },
+  inputSchema: z.object({}),
+  outputSchema: z.object({
+    error: z.string().optional(),
+    found: z.boolean(),
+    preferences: z.string(),
+  }),
 });

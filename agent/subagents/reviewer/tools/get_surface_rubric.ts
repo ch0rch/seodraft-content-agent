@@ -12,8 +12,8 @@ import { REVIEWER_RUBRIC } from "../lib/rubric.generated.js";
  */
 const OUTPUT_SCHEMA = z.object({
   aiPhrasesToAvoid: z.string(),
-  plainEnglishAlternatives: z.string(),
   bestPractices: z.string(),
+  plainEnglishAlternatives: z.string(),
   specs: z.string(),
 });
 
@@ -33,12 +33,6 @@ export default defineTool({
     "Return the review rubric for a content surface: the house AI-phrases-to-avoid and " +
     "plain-English lists, plus that surface's best-practices checklist and format specs " +
     "Call this once with the surface the writer named before reviewing the draft.",
-  inputSchema: z.object({
-    surface: z
-      .enum(SURFACES)
-      .describe("The content surface whose rubric to return."),
-  }),
-  outputSchema: OUTPUT_SCHEMA,
   /**
    * Look up the bundled rubric for `surface`.
    *
@@ -50,9 +44,15 @@ export default defineTool({
     const rubric = REVIEWER_RUBRIC.surfaces[surface];
     return {
       aiPhrasesToAvoid: REVIEWER_RUBRIC.house.aiPhrasesToAvoid,
-      plainEnglishAlternatives: REVIEWER_RUBRIC.house.plainEnglishAlternatives,
       bestPractices: rubric.bestPractices,
+      plainEnglishAlternatives: REVIEWER_RUBRIC.house.plainEnglishAlternatives,
       specs: rubric.specs,
     };
   },
+  inputSchema: z.object({
+    surface: z
+      .enum(SURFACES)
+      .describe("The content surface whose rubric to return."),
+  }),
+  outputSchema: OUTPUT_SCHEMA,
 });

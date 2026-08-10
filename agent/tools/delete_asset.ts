@@ -13,19 +13,10 @@ import { isReservedWriterUrl } from "#lib/writer-preferences.js";
  * it renders as an approve/deny button.
  */
 export default defineTool({
+  approval: always(),
   description:
     "Permanently delete an asset from Vercel Blob storage by its URL. Use only when the writer " +
     "explicitly asks to remove a stored file. This is irreversible.",
-  inputSchema: z.object({
-    url: z.url().describe("The full Vercel Blob URL of the asset to delete."),
-  }),
-  outputSchema: z.object({
-    success: z.boolean(),
-    deleted: z.boolean(),
-    url: z.string(),
-    error: z.string().optional(),
-  }),
-  approval: always(),
   /**
    * Delete the asset.
    *
@@ -35,23 +26,32 @@ export default defineTool({
   async execute({ url }) {
     if (isReservedWriterUrl(url)) {
       return {
-        success: false,
         deleted: false,
-        url,
         error:
           "Writer preferences can only be cleared with clear_writer_preferences.",
+        success: false,
+        url,
       };
     }
     try {
       await del(url);
-      return { success: true, deleted: true, url };
+      return { deleted: true, success: true, url };
     } catch (error) {
       return {
-        success: false,
         deleted: false,
-        url,
         error: error instanceof Error ? error.message : "Delete failed",
+        success: false,
+        url,
       };
     }
   },
+  inputSchema: z.object({
+    url: z.url().describe("The full Vercel Blob URL of the asset to delete."),
+  }),
+  outputSchema: z.object({
+    deleted: z.boolean(),
+    error: z.string().optional(),
+    success: z.boolean(),
+    url: z.string(),
+  }),
 });

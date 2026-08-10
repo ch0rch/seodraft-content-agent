@@ -29,41 +29,41 @@ export default defineAgent({
     "rubric itself and returns a verdict.",
   model: "anthropic/claude-opus-4.8",
   outputSchema: {
-    type: "object",
     additionalProperties: false,
-    required: ["verdict", "issues"],
     properties: {
-      verdict: {
-        type: "string",
-        enum: ["ready", "revise"],
-        description:
-          "'ready' = clean enough to send as-is; 'revise' = fix the issues first.",
-      },
       issues: {
-        type: "array",
         description:
           "One entry per concrete problem; empty when the verdict is 'ready'.",
         items: {
-          type: "object",
           additionalProperties: false,
-          required: ["severity", "rule", "quote", "fix"],
           properties: {
-            severity: { type: "string", enum: ["high", "medium", "low"] },
-            rule: {
+            fix: {
+              description: "A concrete suggested change.",
               type: "string",
-              description: "The rubric rule or reference the excerpt breaks.",
             },
             quote: {
-              type: "string",
               description: "The offending excerpt, quoted from the draft.",
-            },
-            fix: {
               type: "string",
-              description: "A concrete suggested change.",
             },
+            rule: {
+              description: "The rubric rule or reference the excerpt breaks.",
+              type: "string",
+            },
+            severity: { enum: ["high", "medium", "low"], type: "string" },
           },
+          required: ["severity", "rule", "quote", "fix"],
+          type: "object",
         },
+        type: "array",
+      },
+      verdict: {
+        description:
+          "'ready' = clean enough to send as-is; 'revise' = fix the issues first.",
+        enum: ["ready", "revise"],
+        type: "string",
       },
     },
+    required: ["verdict", "issues"],
+    type: "object",
   },
 });

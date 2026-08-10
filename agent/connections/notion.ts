@@ -41,11 +41,11 @@ const APPROVAL_REQUIRED_TOOLS = ["notion-create-pages"];
  * @see {@link https://vercel.com/docs/connect | Vercel Connect}
  */
 export default defineMcpClientConnection({
-  url: "https://mcp.notion.com/mcp",
-  description: "Notion workspace: search, read, and edit pages and databases.",
-  auth: connect(notionConnector),
   approval: ({ toolName }) =>
     APPROVAL_REQUIRED_TOOLS.some((tool) => toolName.includes(tool))
       ? "user-approval"
       : "not-applicable",
+  auth: connect(notionConnector),
+  description: "Notion workspace: search, read, and edit pages and databases.",
+  url: "https://mcp.notion.com/mcp",
 });
