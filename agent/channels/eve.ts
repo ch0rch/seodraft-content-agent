@@ -7,7 +7,7 @@ const localDevAuth = localDev();
  * Dev-only: present a trusted local session as an authenticated user.
  *
  * @remarks
- * The Notion connection is user-scoped, so it needs a `principalType: "user"` session. In
+ * The seodraft connection is user-scoped, so it needs a `principalType: "user"` session. In
  * production the Slack channel supplies one; the eve dev TUI authenticates with `localDev()`,
  * whose `local-dev` principal is not a user, so user-scoped tool calls fail with
  * `principal_required`. This shim defers the trust decision to `localDev()` — returning `null`

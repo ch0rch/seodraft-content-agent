@@ -1,60 +1,75 @@
-# eve Content Agent Template
+# seodraft for Slack
 
-A Slack-based content assistant built on [eve](https://eve.dev). Writers @mention it in
-Slack and it drafts blog posts, LinkedIn and X posts, release notes, and newsletters in your
-house voice, pulling source material from Notion and publishing approved pieces back to Notion
-as the signed-in writer.
+An SEO content agent for Slack, built on [eve](https://eve.dev) and powered by
+[seodraft](https://seodraft.app). @mention it in a channel or DM it, and it plans your topic bank,
+writes the next scheduled article against seodraft's editorial standard, runs seodraft's rules
+check, and delivers the approved draft to your site's repository. Then it turns the article into
+LinkedIn posts, X posts, and newsletter sections.
 
-- **Lives in Slack.** Answers @mentions and DMs, replies in threads, and renders approvals as
-  buttons.
-- **Writes in your voice.** One editable style skill per surface (blog, LinkedIn, X, release
-  notes, newsletter), enforced by a deterministic style-lint tool.
-- **Grounded in Notion.** Each writer signs in to their own Notion through Vercel Connect, so
-  drafts are created as the real person with their own permissions, with no shared secret — and
-  page creation pauses for the writer's approval before it runs.
-- **Stores files in Vercel Blob.** Export drafts, save images and attachments, and read them
-  back, authenticated by the project's OIDC token.
+- **Lives in Slack.** Answers @mentions and DMs, works in threads, and renders every approval as a
+  button.
+- **seodraft is the system of record.** Profile, evidence bank, topic bank, calendar, briefs,
+  drafts, the deterministic `run_gate` check, and delivery to git all stay in seodraft. The agent
+  reads the editorial standard from seodraft at runtime, so it never drifts from it.
+- **Each person signs in as themselves.** seodraft is connected through
+  [Vercel Connect](https://vercel.com/docs/connect) with user-scoped OAuth: every Slack user
+  authorizes their own seodraft account and sees only the workspaces it can open. No API keys.
+- **The human approves.** Approving an article or a profile, delivering a draft, retiring or
+  merging, and every call that spends the user's DataForSEO balance pause for an approve/deny
+  button before they run.
+- **Repurposes approved articles.** One editable style skill per social surface (LinkedIn, X,
+  newsletter), enforced by a deterministic banned-words lint and a fresh-context reviewer.
+
+## What you need
+
+- A [seodraft](https://seodraft.app) account with at least one workspace.
+- A Vercel account and a Slack workspace where you can install an app.
 
 ## Deploy
 
-[![Deploy with Vercel](https://vercel.com/button)](https://vercel.com/new/clone?project-name=eve-content-agent-template&repository-name=eve-content-agent-template&repository-url=https%3A%2F%2Fgithub.com%2Fvercel-labs%2Feve-content-agent-template%2Ftree%2Fmain&connect=%5B%7B%22type%22%3A%22slack%22%2C%22env%22%3A%22SLACK_CONNECTOR%22%2C%22triggers%22%3Atrue%2C%22triggerPath%22%3A%22%2Feve%2Fv1%2Fslack%22%7D%2C%7B%22type%22%3A%22mcp.notion.com%22%2C%22env%22%3A%22NOTION_CONNECTOR%22%7D%5D&stores=%5B%7B%22type%22%3A%22blob%22%2C%22access%22%3A%22public%22%7D%5D)
+[![Deploy with Vercel](https://vercel.com/button)](https://vercel.com/new/clone?project-name=seodraft-content-agent&repository-name=seodraft-content-agent&repository-url=https%3A%2F%2Fgithub.com%2Fch0rch%2Fseodraft-content-agent&connect=%5B%7B%22type%22%3A%22slack%22%2C%22env%22%3A%22SLACK_CONNECTOR%22%2C%22triggers%22%3Atrue%2C%22triggerPath%22%3A%22%2Feve%2Fv1%2Fslack%22%7D%2C%7B%22type%22%3A%22seodraft.app%22%2C%22env%22%3A%22SEODRAFT_CONNECTOR%22%7D%5D&stores=%5B%7B%22type%22%3A%22blob%22%2C%22access%22%3A%22public%22%7D%5D)
 
-Deploying with the button provisions everything the agent needs and wires it up for you:
+The Deploy button provisions what the agent needs and wires it up:
 
 - a **Slack** connector (sets `SLACK_CONNECTOR`, with the event trigger pointed at
   `/eve/v1/slack`),
-- a **Notion** connector (sets `NOTION_CONNECTOR`),
+- a **seodraft** connector (sets `SEODRAFT_CONNECTOR`); Vercel Connect registers the OAuth
+  client with seodraft on its own,
 - a **Vercel Blob** store for the asset tools.
 
-Once deployed, @mention the bot in your Slack workspace to start drafting.
+Once deployed, @mention the bot in Slack. The first time it needs seodraft, it sends you a private
+sign-in link; authorize your seodraft account and the conversation continues.
+
+## How a conversation goes
+
+```text
+you:   @seodraft what's next on the calendar?
+agent: next_write → "How long does a Shopify migration take?" (scheduled Tuesday).
+       Brief: intent, template, angle, 3 accepted evidence pieces, outline. Write it?
+you:   go
+agent: upsert_post (brief, then body) → run_gate passed. Here's the article.
+you:   ship it
+agent: [Approve / Deny] approve_post
+       Approved and delivered as a draft to your-org/your-site.
+       Want a LinkedIn post from it?
+```
 
 ## Tech stack
 
 | Layer | Technology |
 | --- | --- |
 | Agent framework | [eve](https://eve.dev) |
-| Language | TypeScript (strict, ESM) |
+| SEO workspace | [seodraft](https://seodraft.app) MCP server, user-scoped OAuth via [Vercel Connect](https://vercel.com/docs/connect) |
 | Chat surface | Slack, via [Vercel Connect](https://vercel.com/docs/connect) |
-| Source & publishing | Notion (MCP), user-scoped OAuth via [Vercel Connect](https://vercel.com/docs/connect) |
 | File storage | [Vercel Blob](https://vercel.com/docs/vercel-blob) |
 | Model access | [Vercel AI Gateway](https://vercel.com/docs/ai-gateway) |
 | Sandbox | [Vercel Sandbox](https://vercel.com/docs/sandbox) |
 | Lint & format | [Ultracite](https://www.ultracite.ai/) (Biome) |
 
-**Zero static keys.**
-Authentication runs entirely on [Vercel Connect](https://vercel.com/docs/connect)
-(Slack and Notion) and [Vercel OIDC](https://vercel.com/docs/oidc) (Vercel Blob and AI
-Gateway). There are no API keys or client secrets to manage in code or `.env` files: Notion is
-authorized per writer in the browser, and Blob and the model authenticate with the project's
-OIDC token.
-
-## Quick start with an AI coding agent
-
-If you're working with an AI coding agent like Claude Code or Cursor, you can use this prompt to have it help you with building your agent:
-
-```text
-I want to build a Slack agent with the eve framework, using the eve content agent template. Read the setup instructions at https://agent-resources.dev/eve-content-agent-template.md and follow them. They will cover deploying the template, building with eve, how everything works overall, and more.
-```
+**Zero static keys.** Slack and seodraft authenticate through Vercel Connect; Blob and the model
+authenticate with the project's [Vercel OIDC](https://vercel.com/docs/oidc) token. DataForSEO
+credentials, when a workspace uses them, are entered in the seodraft web app and never pass
+through Slack.
 
 ## What's inside
 
@@ -63,43 +78,57 @@ agent/
   agent.ts                  # model configuration
   instructions.md           # the agent's behavior
   channels/slack.ts         # Slack surface (Vercel Connect credentials)
-  connections/notion.ts     # Notion workspace, user-scoped OAuth; page creation requires approval
+  channels/eve.ts           # HTTP API; dev-only shim so the TUI acts as a user
+  connections/seodraft.ts   # seodraft MCP server, user-scoped OAuth; approval policy per tool
   sandbox.ts                # Vercel Sandbox backend
   subagents/
-    researcher/             # fresh-context web researcher (own session, web tools only)
-    reviewer/               # fresh-context draft reviewer (own session); pulls its rubric via a tool
+    researcher/             # fresh-context web researcher (citations, never first-hand evidence)
+    reviewer/               # fresh-context reviewer for social posts and newsletters
   tools/
-    lint_against_style.ts   # deterministic banned-words check
+    lint_against_style.ts   # deterministic banned-words check for social surfaces
     upload_asset.ts         # Vercel Blob: store text or binary content
     list_assets.ts          # Vercel Blob: browse stored assets
     get_asset_info.ts       # Vercel Blob: metadata without downloading
     download_asset.ts       # Vercel Blob: read a stored file back
     delete_asset.ts         # Vercel Blob: delete (requires approval)
-    get_writer_preferences.ts   # load this writer's saved style preferences
+    get_writer_preferences.ts   # load this writer's saved social-post preferences
     save_writer_preferences.ts  # save standing preferences (per-writer, principal-scoped)
     clear_writer_preferences.ts # clear this writer's preferences (requires approval)
   lib/
     writer-preferences.ts   # principal-scoped Blob key + reserved-prefix guard
-    surfaces.generated.ts   # generated SURFACES enum (skill folders are the source of truth)
-  skills/                   # one style skill per surface
-    blog-style/             # + best-practices.md and format-specs.md
-    linkedin-style/         # + best-practices.md and post-specs.md
-    x-style/                # X (Twitter) — + best-practices.md and post-specs.md
-    release-notes-style/
-    newsletter-style/
+    surfaces.generated.ts   # generated SURFACES enum (style skill folders are the source of truth)
+  skills/
+    seo-planning/           # onboarding, profile, evidence, topic bank, calendar
+    seo-article/            # next_write → brief → body → run_gate → approve_post
+    linkedin-style/         # repurposing: + best-practices.md and post-specs.md
+    x-style/                # repurposing: + best-practices.md and post-specs.md
+    newsletter-style/       # repurposing: + best-practices.md and email-specs.md
 shared-references/          # house-wide writing rules (source of truth), synced into each skill
-  ai-phrases-to-avoid.md
-  plain-english-alternatives.md
 scripts/
-  sync-shared.mjs           # syncs shared refs into skills; generates SURFACES + reviewer rubric (pnpm sync:shared)
+  sync-shared.mjs           # syncs shared refs into skills; generates SURFACES + reviewer rubric
 ```
+
+## Approvals
+
+`agent/connections/seodraft.ts` decides which seodraft calls stop for a button:
+
+| Pauses for approval | Why |
+| --- | --- |
+| `approve_post`, `approve_profile`, `deliver_draft`, `archive_topic` | They record or carry out the human's decision, or write to the site's git repository |
+| `archive_post`, `merge_topics` with `confirm: true` | The dry run is free; only the confirming call changes anything |
+| `add_topics`, `complete_onboarding`, `propose_topics`, `refresh_metrics`, `research_topic`, `suggest_topics` | They can spend the user's DataForSEO balance |
+
+Everything else (reads, `upsert_post`, `run_gate`, scheduling) runs without a prompt. Edit
+`APPROVAL_REQUIRED_TOOLS` to change it.
 
 ## Local development
 
-Link the project you deployed (or a fresh one) and pull its environment:
+Link the project you deployed (or a fresh one), attach the seodraft connector, and pull its
+environment:
 
 ```bash
 vercel link
+vercel connect attach seodraft.app/seodraft --yes
 vercel env pull
 ```
 
@@ -109,17 +138,15 @@ Then run the development server and link a model provider with `/model` in the T
 pnpm dev
 ```
 
-You can chat with the agent directly in the dev TUI to test the drafting, style-lint, Notion,
-and Blob flows. The Slack surface itself only runs against a deployment. Ship changes with:
+You can chat with the agent in the dev TUI to test the seodraft, style-lint, and Blob flows; the
+first seodraft call prints a sign-in link. The Slack surface itself only runs against a
+deployment. Ship changes with:
 
 ```bash
 eve deploy
 ```
 
 ### Linting and formatting
-
-This project uses [Ultracite](https://www.ultracite.ai/) (a [Biome](https://biomejs.dev/)
-preset) for linting and formatting:
 
 ```bash
 pnpm check   # check formatting and lint rules
@@ -128,12 +155,13 @@ pnpm fix     # auto-fix what is fixable
 
 ### Setting up the connectors by hand
 
-The Deploy button provisions these for you. To set them up manually (for a project you didn't
-create with the button), use the [Vercel CLI](https://vercel.com/docs/cli):
+The Deploy button provisions these for you. To set them up manually, use the
+[Vercel CLI](https://vercel.com/docs/cli):
 
 ```bash
-# Notion connector (note the printed UID, e.g. mcp.notion.com/notion -> NOTION_CONNECTOR)
-vercel connect create mcp.notion.com --name notion
+# seodraft connector (UID seodraft.app/seodraft -> SEODRAFT_CONNECTOR)
+vercel connect create seodraft.app --name seodraft
+vercel connect attach seodraft.app/seodraft --yes
 
 # Slack connector (note the UID, e.g. slack/<name> -> SLACK_CONNECTOR), then point its
 # event trigger at the route the agent serves
@@ -146,31 +174,33 @@ vercel blob create-store <name> --access public --yes
 
 ## Customizing
 
-- **Voice:** edit the per-surface skills in `agent/skills/*/SKILL.md`, and the
-  `references/banned-words.json` each one lints against. Add a new surface by adding a new
-  `<surface>-style` skill folder and running `pnpm sync:shared` — the `SURFACES` enum shared by
-  `lint_against_style` and the reviewer is generated from the folders, so there's no list to edit.
-- **House-wide rules:** edit the shared writing rules in `shared-references/` (the source of
-  truth), then run `pnpm sync:shared`. It copies them into every skill's `references/` and
-  regenerates the managed `## Shared references` section in each `SKILL.md` (a skill's own
-  `## References` section is left alone), and regenerates `agent/lib/surfaces.generated.ts` and
-  the reviewer's rubric module. The sync also runs automatically on `pnpm dev` and `pnpm build`.
-  Never edit the synced copies or generated files directly.
+- **Article standard:** lives in seodraft (`get_skill`, `run_gate`), not in this repo. Change the
+  workspace profile (voice, article style, CTA, table of contents, internal links) from seodraft.
+- **How the agent works seodraft:** edit `agent/skills/seo-planning/SKILL.md` and
+  `agent/skills/seo-article/SKILL.md`.
+- **Social voice:** edit the per-surface skills in `agent/skills/*-style/SKILL.md`, and the
+  `references/banned-words.json` each one lints against. Add a surface by adding a
+  `<surface>-style` skill folder and running `pnpm sync:shared`.
+- **House-wide rules:** edit `shared-references/`, then run `pnpm sync:shared` (also runs on
+  `pnpm dev` and `pnpm build`). Never edit the synced copies or generated files directly.
 - **Behavior:** edit `agent/instructions.md`.
 - **Model:** edit `agent/agent.ts` (or run `/model` in the dev TUI).
-- **Tools:** add or change tools in `agent/tools/`. The filename is the tool name.
+- **Approvals:** edit `APPROVAL_REQUIRED_TOOLS` in `agent/connections/seodraft.ts`.
 
-The agent auto-updates as you edit these files.
+## Known limits
+
+- **No scheduled runs yet.** seodraft issues user tokens only, and eve schedules run as the app,
+  so a cron job cannot call seodraft on its own. Writing starts from a message in Slack.
 
 ## Learn more
 
-- [Draft content in your voice from Slack with eve](https://vercel.com/kb/guide/eve-content-agent): Vercel Knowledge Base guide
-- [eve documentation](https://eve.dev/docs/introduction): the framework powering this agent.
-- [Vercel Connect](https://vercel.com/docs/connect): manages the Slack and Notion credentials.
-- [Vercel Blob](https://vercel.com/docs/vercel-blob): object storage for the asset tools.
+- [seodraft](https://seodraft.app)
+- [eve documentation](https://eve.dev/docs/introduction)
+- [Vercel Connect](https://vercel.com/docs/connect)
+- [Vercel Blob](https://vercel.com/docs/vercel-blob)
 
-## Related templates
+## Credits
 
-- [eve Chat Template](https://vercel.com/templates/eve/eve-chat-template)
-- [eve Slack Agent](https://vercel.com/templates/eve/eve-slack-agent)
-- [eve Personal Agent](https://vercel.com/templates/nuxt/eve-personal-agent)
+Forked from Vercel Labs'
+[eve Content Agent Template](https://github.com/vercel-labs/eve-content-agent-template)
+(Apache-2.0).

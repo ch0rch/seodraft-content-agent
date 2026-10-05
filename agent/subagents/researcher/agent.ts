@@ -5,8 +5,9 @@ import { defineAgent } from "eve";
  *
  * @remarks
  * A declared subagent — its `subagents/researcher/` location is what marks it as one — that the
- * root agent delegates to when a draft needs facts the Notion source material doesn't cover: a
- * statistic, a competitor detail, a primary-source link, or a claim to verify. It runs in its own
+ * root agent delegates to when a draft needs facts the seodraft brief, profile, and evidence bank
+ * don't cover: a statistic, a competitor detail, a primary-source link, or a claim to verify. Its
+ * findings are citations, never first-hand evidence. It runs in its own
  * child session with no shared history and, like every declared subagent, inherits none of the
  * root's skills, connections, or tools. It does, however, get the framework default harness —
  * which includes `web_search` (provider-native; Anthropic's search for this model) and
@@ -26,7 +27,8 @@ import { defineAgent } from "eve";
 export default defineAgent({
   description:
     "Research a topic on the open web for facts, statistics, primary sources, and links the " +
-    "writer needs but Notion doesn't cover. Runs refined searches against reliable sources and " +
+    "writer needs but the seodraft brief and evidence bank don't cover. Runs refined searches " +
+    "against reliable sources and " +
     "returns cited findings with confidence levels, plus the gaps it couldn't verify. The " +
     "caller passes the question and any known context in the message.",
   model: "anthropic/claude-opus-4.8",

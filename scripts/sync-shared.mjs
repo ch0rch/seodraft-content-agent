@@ -78,7 +78,7 @@ const REVIEWER_RUBRIC_MODULE = join(
   "rubric.generated.ts"
 );
 
-/** Suffix marking a skill folder (`blog-style`); stripped to get the surface (`blog`). */
+/** Suffix marking a skill folder (`linkedin-style`); stripped to get the surface (`linkedin`). */
 const SKILL_SUFFIX = "-style";
 
 /** Suffix marking a skill's per-surface specs reference file (`format-specs.md`). */

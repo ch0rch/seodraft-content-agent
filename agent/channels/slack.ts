@@ -11,11 +11,11 @@ import { slackChannel } from "eve/channels/slack";
  * `vercel connect create slack --name <name> --triggers`, then register this project's trigger
  * destination at `/eve/v1/slack`.
  *
- * @defaultValue The connector UID falls back to `"slack/eve-content-agent"` when
+ * @defaultValue The connector UID falls back to `"slack/seodraft-agent"` when
  * `SLACK_CONNECTOR` is unset.
  */
 export default slackChannel({
   credentials: connectSlackCredentials(
-    process.env.SLACK_CONNECTOR ?? "slack/eve-content-agent"
+    process.env.SLACK_CONNECTOR ?? "slack/seodraft-agent"
   ),
 });
