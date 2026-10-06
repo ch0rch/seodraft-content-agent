@@ -33,8 +33,10 @@ The Deploy button provisions what the agent needs and wires it up:
 
 - a **Slack** connector (sets `SLACK_CONNECTOR`, with the event trigger pointed at
   `/eve/v1/slack`),
-- a **seodraft** connector (sets `SEODRAFT_CONNECTOR`); Vercel Connect registers the OAuth
-  client with seodraft on its own,
+- a **seodraft** connector (sets `SEODRAFT_CONNECTOR`). seodraft is not in the Connect catalog
+  yet, so in the **seodraft.app** row choose **Add** → **OAuth** → **Managed** and enter
+  `https://seodraft.app` as the server URL. Vercel Connect discovers the endpoints and registers
+  the OAuth client with seodraft on its own,
 - a **Vercel Blob** store for the asset tools.
 
 Once deployed, @mention the bot in Slack. The first time it needs seodraft, it sends you a private
