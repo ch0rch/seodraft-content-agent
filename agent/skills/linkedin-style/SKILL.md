@@ -37,7 +37,7 @@ When writing or editing a LinkedIn post:
   hashtags, formats).
 - `references/post-specs.md` — character limits and document/carousel specs for quick lookup.
 - `references/banned-words.json` — words to avoid. Read it once up front for awareness, then run
-  the `lint_against_style` tool (surface `linkedin`) on your draft to check it against this file
+  the `check_style` tool (surface `linkedin`) on your draft to check it against this file
   before proposing the draft to the writer.
 
 ## Shared references

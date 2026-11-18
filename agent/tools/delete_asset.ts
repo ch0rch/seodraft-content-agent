@@ -2,7 +2,7 @@ import { del } from "@vercel/blob";
 import { defineTool } from "eve/tools";
 import { always } from "eve/tools/approval";
 import { z } from "zod";
-import { isReservedWriterUrl } from "#lib/writer-preferences.js";
+import { isReservedUrl, RESERVED_PATH_ERROR } from "#lib/reserved-paths.js";
 
 /**
  * Tool that permanently deletes an asset from Vercel Blob storage.
@@ -24,11 +24,10 @@ export default defineTool({
    * @returns `success`/`deleted` flags and the `url`, or `success: false` with an `error`.
    */
   async execute({ url }) {
-    if (isReservedWriterUrl(url)) {
+    if (isReservedUrl(url)) {
       return {
         deleted: false,
-        error:
-          "Writer preferences can only be cleared with clear_writer_preferences.",
+        error: RESERVED_PATH_ERROR,
         success: false,
         url,
       };

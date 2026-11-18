@@ -1,7 +1,7 @@
 import { head } from "@vercel/blob";
 import { defineTool } from "eve/tools";
 import { z } from "zod";
-import { isReservedWriterUrl } from "#lib/writer-preferences.js";
+import { isReservedUrl, RESERVED_PATH_ERROR } from "#lib/reserved-paths.js";
 
 /**
  * Tool that fetches metadata for a Vercel Blob asset without downloading its content.
@@ -22,9 +22,9 @@ export default defineTool({
    * @returns `exists: true` with the asset's metadata, or `exists: false` with an `error`.
    */
   async execute({ url }) {
-    if (isReservedWriterUrl(url)) {
+    if (isReservedUrl(url)) {
       return {
-        error: "Writer preferences are private — use get_writer_preferences.",
+        error: RESERVED_PATH_ERROR,
         exists: false,
         url,
       };
@@ -33,7 +33,6 @@ export default defineTool({
       const metadata = await head(url);
       return {
         contentType: metadata.contentType,
-        downloadUrl: metadata.downloadUrl,
         exists: true,
         pathname: metadata.pathname,
         size: metadata.size,
@@ -53,7 +52,6 @@ export default defineTool({
   }),
   outputSchema: z.object({
     contentType: z.string().optional(),
-    downloadUrl: z.string().optional(),
     error: z.string().optional(),
     exists: z.boolean(),
     pathname: z.string().optional(),

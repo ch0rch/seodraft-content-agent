@@ -4,3 +4,9 @@
 export const SURFACES = ["linkedin","newsletter","x"] as const;
 
 export type Surface = (typeof SURFACES)[number];
+
+export const SURFACE_DESCRIPTIONS: Readonly<Record<Surface, string>> = {
+  "linkedin": "Use when drafting or editing a LinkedIn post in the house voice.",
+  "newsletter": "Use when drafting or editing an email newsletter issue in the house voice.",
+  "x": "Use when drafting or editing a post or thread for X (Twitter) — voice, hooks, length, threads, hashtags, and links."
+};

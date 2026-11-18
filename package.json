@@ -15,25 +15,29 @@
     "check": "ultracite check",
     "predev": "node scripts/sync-shared.mjs",
     "dev": "eve dev",
+    "eval": "eve eval live",
+    "eval:offline": "EVE_MOCK_MODEL=1 eve eval offline",
     "fix": "ultracite fix",
     "start": "eve start",
     "sync:shared": "node scripts/sync-shared.mjs",
+    "test:smoke": "node --experimental-test-module-mocks --test tests/*.test.mjs",
     "typecheck": "tsc"
   },
   "dependencies": {
-    "@vercel/blob": "2.7.0",
-    "@vercel/connect": "0.6.1",
-    "ai": "7.0.58",
-    "eve": "0.31.3",
-    "zod": "4.4.3"
+    "@vercel/blob": "2.9.0",
+    "@vercel/connect": "2.9.4",
+    "ai": "7.0.176",
+    "eve": "1.0.2",
+    "zod": "4.6.7"
   },
   "devDependencies": {
-    "@biomejs/biome": "2.5.7",
-    "@types/node": "26.2.0",
-    "microsandbox": "0.5.10",
+    "@biomejs/biome": "2.5.15",
+    "@types/node": "26.6.5",
+    "just-bash": "^3.6.0",
     "typescript": "7.0.2",
-    "ultracite": "7.10.2"
+    "ultracite": "8.0.1"
   },
+  "packageManager": "pnpm@10.33.0",
   "engines": {
     "node": ">=24"
   }

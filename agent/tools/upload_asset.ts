@@ -1,10 +1,7 @@
 import { put } from "@vercel/blob";
 import { defineTool } from "eve/tools";
 import { z } from "zod";
-import {
-  isReservedWriterPath,
-  WRITER_PREFERENCES_PREFIX,
-} from "#lib/writer-preferences.js";
+import { isReservedPath, RESERVED_PATH_ERROR } from "#lib/reserved-paths.js";
 
 /**
  * Tool that uploads text or binary content to Vercel Blob storage.
@@ -13,17 +10,20 @@ import {
  * Authorization resolves from the ambient Vercel credentials — the project's OIDC token
  * (`VERCEL_OIDC_TOKEN`, or the `x-vercel-oidc-token` request header on Vercel) — so no
  * `BLOB_READ_WRITE_TOKEN` is required and no token is passed in code. Binary content (images,
- * PDFs) is supplied base64-encoded with `isBase64: true`.
+ * PDFs) is supplied base64-encoded with `isBase64: true`. The project's Blob store is private,
+ * so every asset is written with private access.
  */
 export default defineTool({
   description:
     "Upload text or binary content to Vercel Blob storage and return its URL. Use when the " +
-    "writer wants to save or publish an asset — an exported draft, an image — to durable storage.",
+    "writer wants to save an asset — an exported draft, an image — to durable storage. The " +
+    "store is private: the URL identifies the asset for the other asset tools, and it can't " +
+    "be opened in a browser.",
   /**
    * Upload the content to Blob storage.
    *
    * @param input - Validated tool input.
-   * @returns The asset's `url`, `downloadUrl`, stored `pathname`, and `contentType`, or
+   * @returns The asset's `url`, stored `pathname`, and `contentType`, or
    * `success: false` with an `error` message.
    */
   async execute({
@@ -31,15 +31,13 @@ export default defineTool({
     content,
     contentType,
     isBase64,
-    access,
     addRandomSuffix,
     allowOverwrite,
   }) {
-    if (isReservedWriterPath(pathname)) {
+    if (isReservedPath(pathname)) {
       return {
         contentType: contentType ?? "unknown",
-        downloadUrl: "",
-        error: `"${WRITER_PREFERENCES_PREFIX}" is reserved — use save_writer_preferences instead.`,
+        error: RESERVED_PATH_ERROR,
         pathname,
         success: false,
         url: "",
@@ -48,14 +46,13 @@ export default defineTool({
     try {
       const body = isBase64 ? Buffer.from(content, "base64") : content;
       const blob = await put(pathname, body, {
-        access: access ?? "public",
+        access: "private",
         addRandomSuffix: addRandomSuffix ?? false,
         allowOverwrite: allowOverwrite ?? false,
         contentType,
       });
       return {
         contentType: blob.contentType,
-        downloadUrl: blob.downloadUrl,
         pathname: blob.pathname,
         success: true,
         url: blob.url,
@@ -63,7 +60,6 @@ export default defineTool({
     } catch (error) {
       return {
         contentType: contentType ?? "unknown",
-        downloadUrl: "",
         error: error instanceof Error ? error.message : "Upload failed",
         pathname,
         success: false,
@@ -72,10 +68,6 @@ export default defineTool({
     }
   },
   inputSchema: z.object({
-    access: z
-      .enum(["public", "private"])
-      .optional()
-      .describe('Access level for the asset. Defaults to "public".'),
     addRandomSuffix: z
       .boolean()
       .optional()
@@ -114,7 +106,6 @@ export default defineTool({
   }),
   outputSchema: z.object({
     contentType: z.string(),
-    downloadUrl: z.string(),
     error: z.string().optional(),
     pathname: z.string(),
     success: z.boolean(),

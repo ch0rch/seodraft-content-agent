@@ -44,7 +44,7 @@ When writing or editing a post for X:
   links, hashtags, threads, cadence).
 - `references/post-specs.md` — concrete specs: character limits, hashtag norms, media, links.
 - `references/banned-words.json` — words to avoid. Read it once for awareness, then run the
-  `lint_against_style` tool (surface `x`) on your draft before proposing it to the writer.
+  `check_style` tool (surface `x`) on your draft before proposing it to the writer.
 
 ## Shared references
 

@@ -35,7 +35,7 @@ When writing or editing a newsletter:
 - `references/email-specs.md` — concrete specs: subject line and preheader character limits and
   mobile truncation points, from-name, ~600px width, CTA count, plain-text alt.
 - `references/banned-words.json` — the list of words to avoid. Read it once up front for
-  awareness, then run the `lint_against_style` tool on your draft to check it against this
+  awareness, then run the `check_style` tool on your draft to check it against this
   file before proposing the draft to the writer.
 
 ## Shared references

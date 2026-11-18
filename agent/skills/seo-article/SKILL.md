@@ -1,5 +1,5 @@
 ---
-description: Use when writing, revising, checking, or approving an SEO article in a seodraft workspace.
+description: Use when writing, revising, checking, approving, or translating an SEO article in a seodraft workspace.
 ---
 
 # Writing a seodraft article
@@ -11,7 +11,8 @@ Slack thread; the rules themselves come from `get_skill`.
 
 1. `next_write`. When it returns a scheduled post, write that post's id and term. Don't create a
    new post while a scheduled one is waiting. If the person named a specific article, `get_post`
-   it instead.
+   it instead. When the workspace has an approved content map, its `next` (from `get_content_map`)
+   is the article the strategy wants; say so when it differs from the calendar.
 2. `get_skill` once per thread, and `get_profile` for this workspace. Honor the profile's
    `articleStyle`, `includeCta`, `includeToc`, `firstPerson`, and `internalLinksMin`.
 3. Read `standard`, `serpBrief`, and `customInstructions` from the post. The SERP's People Also Ask
@@ -37,11 +38,21 @@ Slack thread; the rules themselves come from `get_skill`.
 ## Approval
 
 1. Share the article in the thread with the last `run_gate` result.
-2. When the person says to ship it, call `approve_post`. It refuses unless the last `run_gate`
-   passed, marks the article ready, and delivers it to the site's git repository as a draft when a
-   destination is configured. Delivery is not publishing: the person publishes from their CMS.
-3. `deliver_draft` is only for re-sending an already approved article after an edit;
+2. `pipeline_status` reports the workspace's `approvalMode`. With `human`, call `approve_post` only
+   after the person says to ship it. With `agent`, you may call it as soon as the last `run_gate`
+   passed, without waiting to be asked. Either way the call shows an approve/deny button in Slack.
+3. `approve_post` refuses unless the last `run_gate` passed, marks the article ready, and delivers it
+   as a draft when a destination is configured (a file in the site's git repository, or a Sanity
+   draft). Delivery is not publishing: the person publishes from their CMS.
+4. `deliver_draft` is only for re-sending an already approved article after an edit;
    `delivery_status` says where a workspace delivers.
+
+## Translations
+
+A translation is its own article with its own `language` (set with `upsert_post`), written from the
+approved original, and it goes through `run_gate` and approval like any other. Link the two with
+`link_translation` once both declare their language; `unlink_translation` takes one out of the
+cluster before its language changes.
 
 ## Afterwards
 

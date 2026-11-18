@@ -26,12 +26,12 @@ const OUTPUT_SCHEMA = z.object({
  * by `scripts/sync-shared.mjs` from `shared-references/` and each skill's `references/`. It runs
  * in the app runtime with no sandbox, so one call returns the house lists plus the surface's
  * best-practices and specs in a single round-trip. The `surface` input is constrained to the
- * generated {@link SURFACES} enum, matching the `lint_against_style` surface set.
+ * generated {@link SURFACES} enum, matching the `check_style` surface set.
  */
 export default defineTool({
   description:
     "Return the review rubric for a content surface: the house AI-phrases-to-avoid and " +
-    "plain-English lists, plus that surface's best-practices checklist and format specs " +
+    "plain-English lists, plus that surface's best-practices checklist and format specs. " +
     "Call this once with the surface the writer named before reviewing the draft.",
   /**
    * Look up the bundled rubric for `surface`.

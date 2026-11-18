@@ -17,10 +17,15 @@
  * specs, with no sandbox round-trip.
  *
  * The canonical surface list is likewise derived from the `<surface>-style` folders into a
- * shared {@link SURFACES_MODULE} that both `lint_against_style` and `get_surface_rubric` import,
+ * shared {@link SURFACES_MODULE} that both `check_style` and `get_surface_rubric` import,
  * so the folders are the single source of truth and no hand-edited enum can drift.
  *
- * The generated copies, SKILL.md sections, and rubric module are committed, so they ship with
+ * Each skill's `references/banned-words.json` is bundled the same way into
+ * {@link BANNED_WORDS_MODULE}, which `check_style` imports. Tool code can't read a skill's
+ * files at runtime (eve removed `ctx.getSkill()` in 0.66), so the list ships as a module instead;
+ * the JSON in the skill folder stays the source of truth the model also reads.
+ *
+ * The generated copies, SKILL.md sections, and modules are committed, so they ship with
  * `eve build` / `eve deploy` and are visible to `eve info` even when the build command
  * does not trigger the pnpm lifecycle hooks.
  *
@@ -54,7 +59,7 @@ const subagentsDir = resolve(agentDir, "subagents");
  *
  * @remarks
  * The surfaces are derived from the `<surface>-style` skill folders, so the folders are the
- * single source of truth. Both the root's `lint_against_style` tool and the reviewer's
+ * single source of truth. Both the root's `check_style` tool and the reviewer's
  * `get_surface_rubric` tool import `SURFACES` from here — adding a skill folder updates the enum
  * everywhere with no hand-edited list to drift. `lib/` is import-only shared code (it is never
  * mounted into a sandbox), which is how a subagent reaches it across the isolation boundary.
@@ -78,8 +83,23 @@ const REVIEWER_RUBRIC_MODULE = join(
   "rubric.generated.ts"
 );
 
-/** Suffix marking a skill folder (`linkedin-style`); stripped to get the surface (`linkedin`). */
+/**
+ * Generated TypeScript module: each surface's banned-words list, for `check_style`.
+ *
+ * @remarks
+ * Built from every `<surface>-style/references/banned-words.json`. Lives in `lib/` (import-only
+ * shared code). Excluded from Biome in `biome.jsonc` (machine-written) but type-checked by `tsc`.
+ */
+const BANNED_WORDS_MODULE = join(agentDir, "lib", "banned-words.generated.ts");
+
+/** Basename of each skill's banned-words reference file. */
+const BANNED_WORDS_FILE = "banned-words.json";
+
+/** Suffix marking a skill folder (`blog-style`); stripped to get the surface (`blog`). */
 const SKILL_SUFFIX = "-style";
+
+/** Basename of every skill's definition file. */
+const SKILL_FILE = "SKILL.md";
 
 /** Suffix marking a skill's per-surface specs reference file (`format-specs.md`). */
 const SPECS_SUFFIX = "-specs.md";
@@ -292,7 +312,7 @@ const syncSharedReferences = async (sources) => {
       );
       const skillFile = resolveWithin(
         skillsDir,
-        join(skillsDir, skill, "SKILL.md")
+        join(skillsDir, skill, SKILL_FILE)
       );
       const { currentMd, nextMd } = await planSkillSection(skillFile);
       return { currentMd, nextMd, referencesDir, skillFile };
@@ -325,23 +345,26 @@ const syncSharedReferences = async (sources) => {
 };
 
 /**
- * Render the shared surfaces module source from the surface list.
+ * Render the shared surfaces module source from each surface's description.
  *
  * @remarks
- * Emits `SURFACES` as an `as const` tuple plus the `Surface` union derived from it, so both
- * tools can build a `zod` enum and a type from one import. Excluded from Biome (generated) but
- * type-checked by `tsc`.
+ * Emits `SURFACES` as an `as const` tuple plus the `Surface` union derived from it, so tools can
+ * build a `zod` enum and a type from one import, and `SURFACE_DESCRIPTIONS`, which the
+ * `detect_surface` tool gives the decision model as its choices. Excluded from Biome
+ * (generated) but type-checked by `tsc`.
  *
- * @param surfaces - The surface ids, in stable sorted order.
+ * @param descriptions - Each surface id mapped to its skill's `description`, in sorted order.
  * @returns The full module source, with a trailing newline.
  */
-const renderSurfacesModule = (surfaces) =>
+const renderSurfacesModule = (descriptions) =>
   `${[
     GENERATED_HEADER,
     "",
-    `export const SURFACES = ${JSON.stringify(surfaces)} as const;`,
+    `export const SURFACES = ${JSON.stringify(Object.keys(descriptions))} as const;`,
     "",
     "export type Surface = (typeof SURFACES)[number];",
+    "",
+    `export const SURFACE_DESCRIPTIONS: Readonly<Record<Surface, string>> = ${JSON.stringify(descriptions, null, 2)};`,
   ].join("\n")}\n`;
 
 /**
@@ -370,7 +393,7 @@ const renderRubricModule = (data) =>
  * Reads each `<surface>-style` skill's {@link BEST_PRACTICES_FILE} and its single `*-specs.md`
  * file, pairs them with the two house lists, and writes a committed `as const` module the
  * reviewer's `get_surface_rubric` tool imports. The surface key is the skill folder name with
- * its {@link SKILL_SUFFIX} removed, matching the `lint_against_style` surface enum. Reuses the
+ * its {@link SKILL_SUFFIX} removed, matching the `check_style` surface enum. Reuses the
  * same containment checks and write-if-changed behavior as the skill sync.
  *
  * @param sources - The shared house lists, read once by the caller.
@@ -433,15 +456,127 @@ const generateReviewerRubric = async (sources) => {
 };
 
 /**
+ * Read and normalize one skill's banned-words list.
+ *
+ * @remarks
+ * The file must be a JSON array of strings. Entries are trimmed, empties dropped, and duplicates
+ * removed (first occurrence wins), so the generated list is exactly what the lint matches. A
+ * missing file yields an empty list — the surface simply has no banned words — but a file that
+ * exists and is malformed fails the run, so a typo surfaces at build time instead of silently
+ * disabling the lint.
+ *
+ * @param skill - The skill folder name, e.g. `blog-style`.
+ * @returns The normalized banned words for that surface.
+ * @throws When the file is not valid JSON or not an array of strings.
+ */
+const readBannedWords = async (skill) => {
+  const path = resolveWithin(
+    skillsDir,
+    join(skillsDir, skill, "references", BANNED_WORDS_FILE)
+  );
+  let raw;
+  try {
+    raw = await readFile(path, "utf8");
+  } catch (error) {
+    if (error?.code === "ENOENT") {
+      return [];
+    }
+    throw error;
+  }
+  let parsed;
+  try {
+    parsed = JSON.parse(raw);
+  } catch (error) {
+    throw new Error(`${skill}: ${BANNED_WORDS_FILE} is not valid JSON`, {
+      cause: error,
+    });
+  }
+  if (!(Array.isArray(parsed) && parsed.every((w) => typeof w === "string"))) {
+    throw new Error(
+      `${skill}: ${BANNED_WORDS_FILE} must be a JSON array of strings`
+    );
+  }
+  return [...new Set(parsed.map((w) => w.trim()).filter(Boolean))];
+};
+
+/**
+ * Render the banned-words module source.
+ *
+ * @param data - Map of surface id to its normalized banned words.
+ * @returns The full module source, with a trailing newline.
+ */
+const renderBannedWordsModule = (data) =>
+  `${[
+    GENERATED_HEADER,
+    "",
+    'import type { Surface } from "./surfaces.generated.js";',
+    "",
+    `export const BANNED_WORDS: Readonly<Record<Surface, readonly string[]>> = ${JSON.stringify(data, null, 2)};`,
+  ].join("\n")}\n`;
+
+/**
+ * Generate {@link BANNED_WORDS_MODULE} from every surface skill's banned-words list.
+ *
+ * @param surfaces - The surface ids, in stable sorted order.
+ * @returns `true` when the module changed.
+ */
+const generateBannedWordsModule = async (surfaces) => {
+  const entries = await Promise.all(
+    surfaces.map(async (surface) => [
+      surface,
+      await readBannedWords(`${surface}${SKILL_SUFFIX}`),
+    ])
+  );
+  const path = resolveWithin(agentDir, BANNED_WORDS_MODULE);
+  await mkdir(dirname(path), { recursive: true });
+  return writeIfChanged(
+    path,
+    renderBannedWordsModule(Object.fromEntries(entries))
+  );
+};
+
+/** Matches the `description` line inside a SKILL.md frontmatter block. */
+const FRONTMATTER_DESCRIPTION =
+  /^---\n(?:.*\n)*?description:[ \t]*(.+)\n(?:.*\n)*?---/;
+
+/**
+ * Read a skill's `description` from its SKILL.md frontmatter.
+ *
+ * @param skill - The skill folder name.
+ * @returns The description text, trimmed.
+ * @throws When the skill has no single-line `description` in its frontmatter.
+ */
+const readSkillDescription = async (skill) => {
+  const source = await readFile(
+    resolveWithin(skillsDir, join(skillsDir, skill, SKILL_FILE)),
+    "utf8"
+  );
+  const description = FRONTMATTER_DESCRIPTION.exec(source)?.[1]?.trim();
+  if (!description) {
+    throw new Error(`${skill}: no "description" in ${SKILL_FILE} frontmatter`);
+  }
+  return description;
+};
+
+/**
  * Write the shared {@link SURFACES_MODULE} from the derived surface list.
  *
  * @param surfaces - The surface ids, in stable sorted order.
  * @returns `true` when the module changed.
  */
 const generateSurfacesModule = async (surfaces) => {
+  const entries = await Promise.all(
+    surfaces.map(async (surface) => [
+      surface,
+      await readSkillDescription(`${surface}${SKILL_SUFFIX}`),
+    ])
+  );
   const path = resolveWithin(agentDir, SURFACES_MODULE);
   await mkdir(dirname(path), { recursive: true });
-  return writeIfChanged(path, renderSurfacesModule(surfaces));
+  return writeIfChanged(
+    path,
+    renderSurfacesModule(Object.fromEntries(entries))
+  );
 };
 
 const sharedSources = await readSources();
@@ -449,8 +584,10 @@ const { skills, written, sections } = await syncSharedReferences(sharedSources);
 const { changed, surfaces: surfaceIds } =
   await generateReviewerRubric(sharedSources);
 await generateSurfacesModule(surfaceIds);
+const bannedChanged = await generateBannedWordsModule(surfaceIds);
 process.stdout.write(
   `shared skill references: wrote ${written} file(s), updated ${sections} SKILL.md ` +
     `section(s) across ${skills} skill(s); reviewer rubric: ` +
-    `${changed ? "regenerated" : "unchanged"} (${surfaceIds.length} surfaces)\n`
+    `${changed ? "regenerated" : "unchanged"} (${surfaceIds.length} surfaces); ` +
+    `banned words: ${bannedChanged ? "regenerated" : "unchanged"}\n`
 );

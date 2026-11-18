@@ -1,7 +1,7 @@
 import { list } from "@vercel/blob";
 import { defineTool } from "eve/tools";
 import { z } from "zod";
-import { isReservedWriterPath } from "#lib/writer-preferences.js";
+import { isReservedPath } from "#lib/reserved-paths.js";
 
 /**
  * Tool that lists assets in Vercel Blob storage, optionally filtered by path prefix.
@@ -13,7 +13,8 @@ import { isReservedWriterPath } from "#lib/writer-preferences.js";
 export default defineTool({
   description:
     "List assets in Vercel Blob storage, optionally filtered by a path prefix. Returns each " +
-    "asset's URL, size, and upload date. Use to browse stored content or locate an asset.",
+    "asset's URL, size, and upload date. When hasMore is true, pass the returned cursor " +
+    "with the same prefix to get the next page, even if the current page has no visible assets.",
   /**
    * List matching assets.
    *
@@ -21,15 +22,16 @@ export default defineTool({
    * @returns The matching `assets`, their `count`, a `hasMore` flag, and a pagination
    * `cursor`, or an empty list with an `error` message on failure.
    */
-  async execute({ prefix, limit }) {
+  async execute({ prefix, limit, cursor: inputCursor }) {
     try {
-      const { blobs, hasMore, cursor } = await list({ limit, prefix });
-      const visible = blobs.filter(
-        (blob) => !isReservedWriterPath(blob.pathname)
-      );
+      const { blobs, hasMore, cursor } = await list({
+        cursor: inputCursor,
+        limit,
+        prefix,
+      });
+      const visible = blobs.filter((blob) => !isReservedPath(blob.pathname));
       return {
         assets: visible.map((blob) => ({
-          downloadUrl: blob.downloadUrl,
           pathname: blob.pathname,
           size: blob.size,
           uploadedAt: blob.uploadedAt.toISOString(),
@@ -49,6 +51,12 @@ export default defineTool({
     }
   },
   inputSchema: z.object({
+    cursor: z
+      .string()
+      .optional()
+      .describe(
+        "The cursor returned by the previous page. Keep the same prefix."
+      ),
     limit: z
       .number()
       .int()
@@ -66,7 +74,6 @@ export default defineTool({
   outputSchema: z.object({
     assets: z.array(
       z.object({
-        downloadUrl: z.string(),
         pathname: z.string(),
         size: z.number(),
         uploadedAt: z.string(),

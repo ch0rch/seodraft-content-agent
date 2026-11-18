@@ -1,4 +1,6 @@
 import { defineAgent } from "eve";
+import { MOCK_MODELS, structuredReplyModel } from "../../lib/mock-model.js";
+import { REVIEW_MODEL } from "../../lib/models.js";
 
 /**
  * Fresh-context reviewer subagent.
@@ -13,57 +15,28 @@ import { defineAgent } from "eve";
  * `scripts/sync-shared.mjs`) of the house lists and each surface's best-practices and specs, so
  * no skills or sandbox are needed. That isolation is the point — a reviewer that never saw the
  * source or the drafting reasoning catches the voice drift, AI-tells, and spec misses that
- * self-review rationalizes away. It complements `lint_against_style` (a deterministic
- * banned-words floor) by judging the qualitative rubric a regex cannot.
+ * self-review rationalizes away. The `check_style` tool also sends a draft here when its
+ * decision-model rules are too close to call, so this agent is the fallback judge for both.
  *
- * `description` is required for a subagent: the root reads it to decide when to delegate.
- * `outputSchema` makes the verdict a structured result the root can act on directly.
+ * `defaultTools: false` removes the sandbox and web tools, leaving `get_surface_rubric` as the
+ * reviewer's only tool: a review needs the draft and the rubric, nothing else. Under
+ * {@link MOCK_MODELS} the model is a mock that always returns a `ready` verdict.
+ *
+ * `tool: false` hides the default model-facing subagent tool: the root reaches this agent through
+ * the `review` workflow tool (`agent/tools/review.ts`), which opens it with `ctx.agent()` and
+ * requests the structured verdict as the turn's `outputSchema`. `description` is still required
+ * for a subagent.
  *
  * @see The review rubric and verdict contract in this folder's `instructions.md`.
  */
 export default defineAgent({
+  defaultTools: false,
   description:
     "Review a finished draft with fresh context against the active surface's style rubric " +
-    "(voice, AI-tells, plain English, structure, specs) before it goes to the writer. The " +
-    "caller passes the surface and the draft in the message; the reviewer loads the matching " +
-    "rubric itself and returns a verdict.",
-  model: "anthropic/claude-opus-4.8",
-  outputSchema: {
-    additionalProperties: false,
-    properties: {
-      issues: {
-        description:
-          "One entry per concrete problem; empty when the verdict is 'ready'.",
-        items: {
-          additionalProperties: false,
-          properties: {
-            fix: {
-              description: "A concrete suggested change.",
-              type: "string",
-            },
-            quote: {
-              description: "The offending excerpt, quoted from the draft.",
-              type: "string",
-            },
-            rule: {
-              description: "The rubric rule or reference the excerpt breaks.",
-              type: "string",
-            },
-            severity: { enum: ["high", "medium", "low"], type: "string" },
-          },
-          required: ["severity", "rule", "quote", "fix"],
-          type: "object",
-        },
-        type: "array",
-      },
-      verdict: {
-        description:
-          "'ready' = clean enough to send as-is; 'revise' = fix the issues first.",
-        enum: ["ready", "revise"],
-        type: "string",
-      },
-    },
-    required: ["verdict", "issues"],
-    type: "object",
-  },
+    "(voice, AI-tells, plain English, structure, specs) and return a verdict. The caller " +
+    "passes the surface and the draft; the reviewer loads the matching rubric itself.",
+  model: MOCK_MODELS
+    ? structuredReplyModel(() => ({ issues: [], verdict: "ready" }))
+    : REVIEW_MODEL,
+  tool: false,
 });
